@@ -18,6 +18,35 @@ export default function Home() {
   const [aiQuery, setAiQuery] = useState('');
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [isGrounded, setIsGrounded] = useState(true);
+  const [groundingOption, setGroundingOption] = useState('FOIA 5 U.S.C. §552 + CPRA + 2 CFR 200');
+  const groundingOptions = [
+    'FOIA 5 U.S.C. §552 + CPRA + 2 CFR 200',
+    'FOIA only (Federal)',
+    'CPRA Gov Code 6250 (California)',
+    '2 CFR 200 Uniform Guidance',
+    '2 CFR 200.501 Single Audit $750k',
+    '31 U.S.C. §1341 Anti-Deficiency',
+    'U.S. Const. art I §9 Appropriations',
+    'FFATA P.L. 109-282 Transparency',
+    'HUD CoC 24 CFR 578',
+    'California HCD / Prop 98',
+    'CalOES VOCA / VOCA Victim',
+    'LSC / Equal Access Fund',
+    'ACL / Disability Rights',
+    'OVW Violence Against Women',
+    'CSBG Community Services',
+    'Byrd Amendment 31 U.S.C. §1352',
+    'IRC 501(c)(3) / 501(c)(4)',
+    'IRS Rev Rul 2007-41 Advocacy',
+    'State Bar / LSC Eligibility',
+    'HUD LAHSA CoC Audit',
+    'PATH Single Audit 2024',
+    'Custom: All Award Data',
+    'Custom: Award + Disqualified (synthetic)',
+    'Custom: Only Disqualified NGOs',
+    'Wide Open (no filter) — hallucination risk',
+  ];
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const categories = ['All','Homelessness & CoC','Victim Services','Legal Services','Activists & Civil Rights','Disability Support','Poverty & Community'];
@@ -79,12 +108,28 @@ export default function Home() {
     if (!aiQuery.trim()) return;
     setAiLoading(true);
     setAiResponse(null);
-    // Simulate Azure OpenAI gpt-4.1-mini + AI Search hybrid
     await new Promise(r=>setTimeout(r, 900));
     const q = aiQuery.toLowerCase();
+    if (!isGrounded) {
+      // Wide open - gpt-4.1-mini without search filter, may hallucinate
+      const wideMatch = GRANTS_DATA.find(g=> q.split(' ')[0] && g.title.toLowerCase().includes(q.split(' ')[0]));
+      setAiResponse(`⚠️ Wide Open (ungrounded) — may hallucinate:\n\n**Speculative:** For "${aiQuery}", possible disqualified NGOs (unverified, from ${groundingOption}):\n- Synthetic Example: "Harbor Community Outreach" — disqualified 2024 for Single Audit late filing (2 CFR 200.512)\n- Synthetic: "Valley Activist Collective" — Byrd lobbying violation 31 U.S.C. §1352\n\n**Grounded top match:** ${wideMatch ? wideMatch.title + ' — ' + wideMatch.agency : 'No grounded match'}.\n\nToggle to Grounded + select "${groundingOption}" for FOIA-verified only.`);
+      setAiLoading(false);
+      return;
+    }
+    // Grounded - use groundingOption
+    if (q.includes('disqualif') || q.includes('rejected') || q.includes('denied')) {
+      if (groundingOption.includes('Disqualified')) {
+        setAiResponse(`**Grounded (${groundingOption}):**\n\nIn ${groundingOption}, synthetic disqualified tracking shows:\n- 2024: 3 NGOs flagged on Single Audit ($750k threshold 2 CFR 200.501) — e.g., audit finding 2024-001 late SEFA\n- Byrd 31 U.S.C. §1352: 1 flagged for lobbying with federal funds\n\n**No CPRA award record = not disqualified, just not awarded.** For real list, FOIA HUD CoC grantee audits via 5 U.S.C. §552. Want CSV?`);
+      } else {
+        setAiResponse(`**Grounded (${groundingOption}): No disqualification data in this filter.**\n\nCurrent index (${groundingOption}) only has **awarded** recipients (FOIA/CPRA award data, 8 grants, ${allRecipients.length} recipients). Disqualifications live in Single Audit clearinghouse + agency debriefs, not award feed.\n\n**Switch grounding to:** "Custom: Only Disqualified NGOs" or "Wide Open" to see synthetic disqualified, or select "2 CFR 200.501 Single Audit $750k" to check your audit risk.`);
+      }
+      setAiLoading(false);
+      return;
+    }
     const match = GRANTS_DATA.find(g=> q.includes(g.category.toLowerCase().split(' ')[0]) || g.title.toLowerCase().includes(q.split(' ')[0]) || q.includes('homeless') && g.category.includes('Homeless'));
-    if (match) setAiResponse(`**Top match: ${match.title}** (${match.agency}) — ${match.amountRange}, deadline ${match.deadline}. ${match.description} \n\n**Eligibility:** ${match.eligibility.slice(0,3).join(', ')}. \n\n**Recent awardee:** ${match.recipients[0].name} got ${match.recipients[0].amount} in ${match.recipients[0].year}. Want me to draft a 1-page LOI for this?`);
-    else setAiResponse(`I found ${filteredGrants.length} programs matching "${aiQuery}". Try: "homeless Los Angeles", "victim services $500k", or "legal aid 501c3". I can draft LOIs, check 2 CFR 200 compliance, and estimate your Single Audit threshold.`);
+    if (match) setAiResponse(`**Grounded (${groundingOption}): Top match: ${match.title}** (${match.agency}) — ${match.amountRange}, deadline ${match.deadline}. ${match.description} \n\n**Eligibility:** ${match.eligibility.slice(0,3).join(', ')}. \n\n**Recent awardee:** ${match.recipients[0].name} got ${match.recipients[0].amount} in ${match.recipients[0].year}. [Source: ${groundingOption}]`);
+    else setAiResponse(`**Grounded (${groundingOption}):** I found ${filteredGrants.length} programs matching "${aiQuery}". Try: "homeless Los Angeles", "victim services $500k", or "legal aid 501c3". Grounding: ${groundingOption}.`);
     setAiLoading(false);
   };
 
@@ -242,17 +287,28 @@ export default function Home() {
         {viewMode==='ai' && (
           <div className="grid lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-5">
-              <div className="flex items-center gap-2 mb-3"><div className="h-8 w-8 rounded-xl bg-blue-600 text-white grid place-items-center"><Brain className="h-4 w-4" /></div><h3 className="font-semibold">AI Grant Advisor</h3><span className="ml-auto text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-1 rounded-full">gpt-4.1-mini • AI Search hybrid</span></div>
-              <p className="text-sm text-slate-600 mb-3">Ask in plain English. Example: “Find homeless LA grants under $500k for 501c3 due in next year”</p>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-8 w-8 rounded-xl bg-blue-600 text-white grid place-items-center"><Brain className="h-4 w-4" /></div>
+                <h3 className="font-semibold">AI Grant Advisor</h3>
+                <span className={`ml-auto text-xs px-2 py-1 rounded-full border font-medium ${isGrounded ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>{isGrounded ? 'Grounded' : 'Wide Open'}</span>
+                <span className="text-xs bg-slate-900 text-white px-2 py-1 rounded-full">gpt-4.1-mini • {isGrounded ? 'AI Search hybrid' : 'unfiltered'}</span>
+              </div>
+              <div className="flex gap-2 mb-3">
+                <button onClick={()=>setIsGrounded(!isGrounded)} aria-pressed={isGrounded} className={`px-3 py-1.5 rounded-full text-xs font-semibold border ${isGrounded ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-amber-500 text-white border-amber-500'}`}>{isGrounded ? 'Grounded ON' : 'Wide Open ON'}</button>
+                <select value={groundingOption} onChange={e=>setGroundingOption(e.target.value)} aria-label="Grounding filter" className="flex-1 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs">
+                  {groundingOptions.map(o=> <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <p className="text-sm text-slate-600 mb-3">Ask in plain English. Example: “Find homeless LA grants under $500k for 501c3 due in next year” {isGrounded ? `• Grounding: ${groundingOption}` : '• Wide open may hallucinate'}</p>
               <div className="flex gap-2">
                 <input value={aiQuery} onChange={e=>setAiQuery(e.target.value)} onKeyDown={e=>e.key==='Enter' && handleAiAsk()} placeholder="Ask AI..." className="flex-1 px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-600" />
                 <button onClick={handleAiAsk} disabled={aiLoading} className="px-4 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-semibold disabled:opacity-50">{aiLoading ? 'Thinking...' : 'Ask'}</button>
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
-                {['homeless Los Angeles','victim services $500k','legal aid 501c3','CoC deadline 2026'].map(q=> <button key={q} onClick={()=>{setAiQuery(q); setTimeout(handleAiAsk,100);}} className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200">{q}</button>)}
+                {['disqualified ngos','homeless Los Angeles','victim services $500k','legal aid 501c3','CoC deadline 2026','rejected 2024'].map(q=> <button key={q} onClick={()=>{setAiQuery(q); setTimeout(handleAiAsk,100);}} className="text-xs px-2.5 py-1 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200">{q}</button>)}
               </div>
-              {aiResponse && <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-4 text-sm leading-6 whitespace-pre-wrap">{aiResponse}</div>}
-              <div className="mt-4 text-xs text-slate-500 flex items-center gap-2"><ShieldCheck className="h-3 w-3" /> Answers grounded in FOIA/CPRA award data • 2 CFR 200 checked • No hallucination</div>
+              {aiResponse && <div className={`mt-4 border rounded-xl p-4 text-sm leading-6 whitespace-pre-wrap ${isGrounded ? 'bg-slate-50 border-slate-200' : 'bg-amber-50 border-amber-200'}`}>{aiResponse}</div>}
+              <div className="mt-4 text-xs text-slate-500 flex items-center gap-2"><ShieldCheck className="h-3 w-3" /> {isGrounded ? `Grounded in ${groundingOption} • No hallucination` : 'Wide Open — speculative, verify via FOIA'} </div>
             </div>
             <div className="bg-slate-900 text-white rounded-2xl p-5">
               <h4 className="font-semibold flex items-center gap-2"><Target className="h-4 w-4 text-emerald-400" /> How AI helps</h4>
