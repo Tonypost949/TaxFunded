@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { GRANTS_DATA, GrantItem } from './data/grants';
-import { Search, Building2, Calendar, ExternalLink, Award, MapPin, Users, ShieldCheck, Mic, MicOff, Volume2, VolumeX, Sparkles, TrendingUp, Filter, ChevronDown, X, ArrowUpRight, Database, FileText, Globe, Zap, MessageSquare, BarChart3, Upload, Brain, Target, Clock, DollarSign } from 'lucide-react';
+import { GRANTS_DATA, DISQUALIFIED_DATA, GrantItem } from './data/grants';
+import { Search, Building2, Calendar, ExternalLink, Award, MapPin, Users, ShieldCheck, Mic, MicOff, Volume2, VolumeX, Sparkles, TrendingUp, Filter, ChevronDown, X, ArrowUpRight, Database, FileText, Globe, Zap, MessageSquare, BarChart3, Upload, Brain, Target, Clock, DollarSign, Share2, Link as LinkIcon, AlertTriangle, Calculator, ShieldAlert } from 'lucide-react';
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,7 +11,7 @@ export default function Home() {
   const [selectedGrant, setSelectedGrant] = useState<GrantItem | null>(null);
   const [selectedCounty, setSelectedCounty] = useState<string>('All');
   const [filterUpcomingYear, setFilterUpcomingYear] = useState(false);
-  const [viewMode, setViewMode] = useState<'dashboard' | 'simple-grants' | 'simple-recipients' | 'legal' | 'ai' | 'analytics'>('dashboard');
+  const [viewMode, setViewMode] = useState<'dashboard' | 'simple-grants' | 'simple-recipients' | 'legal' | 'ai' | 'analytics' | 'disqualified' | 'officers'>('dashboard');
   const [isListening, setIsListening] = useState(false);
   const [speakingId, setSpeakingId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
@@ -275,6 +275,8 @@ export default function Home() {
               ['dashboard','Dashboard'],
               ['ai','AI Advisor'],
               ['analytics','Analytics'],
+              ['disqualified','Disqualified'],
+              ['officers','Officers'],
               ['simple-grants','Grants'],
               ['simple-recipients','Recipients'],
               ['legal','Legal Hub'],
@@ -371,6 +373,73 @@ export default function Home() {
           </div>
         )}
 
+        {viewMode==='disqualified' && (
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-5">
+              <h3 className="font-semibold flex items-center gap-2 text-red-900"><ShieldAlert className="h-5 w-5" /> Disqualified Organizations — FOIA/Single Audit Grounded</h3>
+              <p className="text-sm text-red-700 mt-1">Grounded in 2 CFR 200.512 + Byrd Amendment. {DISQUALIFIED_DATA.length} orgs flagged. Click NPI calculator for forensic score. Wide open synthetic disqualifications also shown when Wide Open ON.</p>
+              <a href="https://tonypost949.github.io/NPI---Non-Profiteers-Index/" target="_blank" className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 bg-red-600 text-white rounded-xl text-xs font-semibold">Open NPI Calculator <ExternalLink className="h-3 w-3" /></a>
+            </div>
+            <div className="grid gap-4">
+              {DISQUALIFIED_DATA.map((org, idx)=> (
+                <div key={idx} className="bg-white rounded-2xl border border-red-200 p-5">
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <span className="bg-red-600 text-white text-xs font-semibold px-2.5 py-1 rounded-full">{org.year} Disqualified</span>
+                    <span className="bg-white border border-slate-200 text-xs px-2 py-1 rounded-full">{org.location}</span>
+                    {org.npi && <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${org.npi.risk==='Critical' ? 'bg-red-50 border-red-200 text-red-800' : org.npi.risk==='High' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-100'}`}>NPI {org.npi.score} {org.npi.risk}</span>}
+                  </div>
+                  <h4 className="font-semibold text-slate-900">{org.name}</h4>
+                  {org.ein && <div className="text-xs text-slate-500">EIN {org.ein}</div>}
+                  <p className="text-sm text-slate-600 mt-1">{org.description}</p>
+                  {org.disqualifiedReason && <div className="mt-2 text-xs bg-red-50 border border-red-200 p-2.5 rounded-xl"><span className="font-semibold text-red-800">Reason:</span> {org.disqualifiedReason}</div>}
+                  {org.officers && <div className="mt-2 text-xs"><span className="font-semibold">Officers:</span> {org.officers.map(o=> `${o.name} (${o.title})`).join(', ')}</div>}
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {org.website && <a href={org.website} target="_blank" className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-white border border-slate-200 hover:bg-slate-50"><LinkIcon className="h-3 w-3" /> Website</a>}
+                    {org.facebook && <a href={org.facebook} target="_blank" className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700"><Share2 className="h-3 w-3" /> Facebook</a>}
+                    {org.propublicaUrl && <a href={org.propublicaUrl} target="_blank" className="text-xs px-2.5 py-1 rounded-full bg-slate-900 text-white">ProPublica</a>}
+                    {org.opencorpUrl && <a href={org.opencorpUrl} target="_blank" className="text-xs px-2.5 py-1 rounded-full bg-white border">OpenCorporates</a>}
+                    {org.usaspendingUrl && <a href={org.usaspendingUrl} target="_blank" className="text-xs px-2.5 py-1 rounded-full bg-white border">USASpending</a>}
+                    {org.npi && <a href={`https://tonypost949.github.io/NPI---Non-Profiteers-Index/#calc?assets=${org.npi.assets}&income=${org.npi.income}&gov=${org.npi.govRevenue}&spending=${org.npi.spending}&direct=${org.npi.direct}`} target="_blank" className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800"><Calculator className="h-3 w-3" /> NPI {org.npi.score}</a>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {viewMode==='officers' && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center gap-2">
+              <Users className="h-5 w-5 text-slate-700" />
+              <h3 className="font-semibold">Officers of All Orgs — Disqualified + Awarded</h3>
+              <span className="ml-auto text-xs bg-slate-100 border px-2 py-1 rounded-full">{allRecipients.length + DISQUALIFIED_DATA.length} officers</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 border-b text-xs uppercase tracking-wide text-slate-600"><tr><th className="p-3">Org</th><th className="p-3">Officer</th><th className="p-3">Title</th><th className="p-3">Status</th><th className="p-3">NPI</th><th className="p-3">Links</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {[...allRecipients.map((r:any)=>({...r, status:'awarded', disqualifiedReason: null})), ...DISQUALIFIED_DATA].flatMap((org:any, idx)=>
+                    (org.officers||[]).map((off:any, oi:number)=> (
+                      <tr key={`${idx}-${oi}`} className="hover:bg-slate-50">
+                        <td className="p-3 font-medium max-w-xs truncate">{org.name}</td>
+                        <td className="p-3">{off.name}</td>
+                        <td className="p-3 text-slate-600">{off.title}</td>
+                        <td className="p-3"><span className={`text-xs px-2 py-1 rounded-full ${org.status==='disqualified' ? 'bg-red-600 text-white' : 'bg-emerald-50 border border-emerald-200 text-emerald-700'}`}>{org.status}</span></td>
+                        <td className="p-3 font-mono text-xs">{org.npi ? `${org.npi.score} ${org.npi.risk}` : '—'}</td>
+                        <td className="p-3 flex gap-1 flex-wrap">
+                          {org.website && <a href={org.website} target="_blank" className="text-blue-600 hover:underline text-xs">Web</a>}
+                          {org.facebook && <a href={org.facebook} target="_blank" className="text-blue-600 hover:underline text-xs">FB</a>}
+                          {org.propublicaUrl && <a href={org.propublicaUrl} target="_blank" className="text-blue-600 hover:underline text-xs">990</a>}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {viewMode==='dashboard' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredGrants.map((grant)=> (
@@ -392,15 +461,33 @@ export default function Home() {
                     <div><div className="text-[11px] uppercase tracking-wide font-semibold text-slate-500">Deadline</div><div className="font-semibold text-slate-900 mt-0.5 flex items-center gap-1"><Calendar className="h-3 w-3 text-slate-400" /> {grant.deadline}</div></div>
                   </div>
                   <div className="mt-4 border-t border-slate-100 pt-3">
-                    <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 mb-2"><Users className="h-3.5 w-3.5 text-slate-500" /> Recent recipients</div>
-                    <div className="space-y-1.5">
-                      {grant.recipients.slice(0,2).map((rec,idx)=> (
-                        <div key={idx} className="flex items-center justify-between text-xs bg-white border border-slate-100 px-2.5 py-2 rounded-xl">
-                          <span className="font-medium text-slate-900 truncate max-w-[160px]" title={rec.name}>{rec.name}</span>
-                          <span className="flex items-center gap-2 shrink-0"><span className="text-slate-500">{rec.year}</span><span className="font-semibold text-emerald-700">{rec.amount}</span></span>
+                    <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 mb-2"><Users className="h-3.5 w-3.5 text-slate-500" /> Recent recipients — officers + NPI + free data</div>
+                    <div className="space-y-2">
+                      {grant.recipients.slice(0,2).map((rec:any,idx)=> (
+                        <div key={idx} className="bg-white border border-slate-100 rounded-xl p-2.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-medium text-sm text-slate-900 truncate" title={rec.name}>{rec.name}</div>
+                              {rec.ein && <div className="text-[11px] text-slate-500">EIN {rec.ein} • {rec.location}</div>}
+                              {rec.officers && <div className="text-[11px] text-slate-600 mt-0.5">Officers: {rec.officers.map((o:any)=> `${o.name} (${o.title})`).join(', ')}</div>}
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-bold text-emerald-700 text-xs">{rec.amount}</div>
+                              <div className="text-[11px] text-slate-500">{rec.year}</div>
+                              {rec.npi && <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-1 inline-block ${rec.npi.risk==='Critical'?'bg-red-50 text-red-700 border border-red-200': rec.npi.risk==='High'?'bg-amber-50 text-amber-700 border border-amber-200':'bg-slate-100'}`}>NPI {rec.npi.score} {rec.npi.risk}</div>}
+                            </div>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {rec.website && <a href={rec.website} target="_blank" className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-white border border-slate-200"><LinkIcon className="h-3 w-3" /> Web</a>}
+                            {rec.facebook && <a href={rec.facebook} target="_blank" className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-blue-50 border border-blue-200 text-blue-700"><Share2 className="h-3 w-3" /> FB</a>}
+                            {rec.propublicaUrl && <a href={rec.propublicaUrl} target="_blank" className="text-[11px] px-2 py-1 rounded-full bg-slate-900 text-white">990 ProPublica</a>}
+                            {rec.opencorpUrl && <a href={rec.opencorpUrl} target="_blank" className="text-[11px] px-2 py-1 rounded-full bg-white border">OpenCorporates</a>}
+                            {rec.usaspendingUrl && <a href={rec.usaspendingUrl} target="_blank" className="text-[11px] px-2 py-1 rounded-full bg-white border">USASpending</a>}
+                            {rec.npi && <a href={`https://tonypost949.github.io/NPI---Non-Profiteers-Index/#calc?assets=${rec.npi.assets}&income=${rec.npi.income}&gov=${rec.npi.govRevenue}&spending=${rec.npi.spending}&direct=${rec.npi.direct}`} target="_blank" className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800"><Calculator className="h-3 w-3" /> NPI</a>}
+                          </div>
                         </div>
                       ))}
-                      {grant.recipients.length>2 && <div className="text-[11px] text-slate-500 text-right">+{grant.recipients.length-2} more</div>}
+                      {grant.recipients.length>2 && <div className="text-[11px] text-slate-500 text-right">+{grant.recipients.length-2} more • View Officers tab for all</div>}
                     </div>
                   </div>
                 </div>
